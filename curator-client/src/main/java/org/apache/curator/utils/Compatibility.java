@@ -16,14 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.curator.utils;
 
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.server.quorum.QuorumPeer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.InetSocketAddress;
 
 /**
  * Utils to help with ZK 3.4.x compatibility
@@ -31,7 +35,11 @@ import java.lang.reflect.Method;
 public class Compatibility
 {
     private static final boolean hasZooKeeperAdmin;
+    private static final boolean hasPersistentWatchers;
     private static final Method queueEventMethod;
+    private static final Method getReachableOrOneMethod;
+    private static final Field addrField;
+
     private static final Logger logger = LoggerFactory.getLogger(Compatibility.class);
 
     static
@@ -49,6 +57,19 @@ public class Compatibility
         }
         hasZooKeeperAdmin = localHasZooKeeperAdmin;
 
+        boolean localHasPersistentWatchers;
+        try
+        {
+            Class.forName("org.apache.zookeeper.AddWatchMode");
+            localHasPersistentWatchers = true;
+        }
+        catch ( ClassNotFoundException e )
+        {
+            localHasPersistentWatchers = false;
+            logger.info("Persistent Watchers are not available in the version of the ZooKeeper library being used");
+        }
+        hasPersistentWatchers = localHasPersistentWatchers;
+
         Method localQueueEventMethod;
         try
         {
@@ -61,6 +82,31 @@ public class Compatibility
             LoggerFactory.getLogger(Compatibility.class).info("Using emulated InjectSessionExpiration");
         }
         queueEventMethod = localQueueEventMethod;
+
+        Method localGetReachableOrOneMethod;
+        try
+        {
+            Class<?> multipleAddressesClass = Class.forName("org.apache.zookeeper.server.quorum.MultipleAddresses");
+            localGetReachableOrOneMethod = multipleAddressesClass.getMethod("getReachableOrOne");
+            LoggerFactory.getLogger(Compatibility.class).info("Using org.apache.zookeeper.server.quorum.MultipleAddresses");
+        }
+        catch ( ReflectiveOperationException ignore )
+        {
+            localGetReachableOrOneMethod = null;
+        }
+        getReachableOrOneMethod = localGetReachableOrOneMethod;
+
+        Field localAddrField;
+        try
+        {
+            localAddrField = QuorumPeer.QuorumServer.class.getField("addr");
+        }
+        catch ( NoSuchFieldException e )
+        {
+            localAddrField = null;
+            LoggerFactory.getLogger(Compatibility.class).error("Could not get addr field! Reconfiguration fail!");
+        }
+        addrField = localAddrField;
     }
 
     /**
@@ -71,6 +117,26 @@ public class Compatibility
     public static boolean isZK34()
     {
         return !hasZooKeeperAdmin;
+    }
+
+    /**
+     * Return true if the ZooKeeperAdmin class is available
+     *
+     * @return true/false
+     */
+    public static boolean hasZooKeeperAdmin()
+    {
+        return hasZooKeeperAdmin;
+    }
+
+    /**
+     * Return true if persistent watchers are available
+     *
+     * @return true/false
+     */
+    public static boolean hasPersistentWatchers()
+    {
+        return hasPersistentWatchers;
     }
 
     /**
@@ -97,5 +163,33 @@ public class Compatibility
                 logger.error("Could not call Testable.queueEvent()", e);
             }
         }
+    }
+
+    public static String getHostAddress(QuorumPeer.QuorumServer server)
+    {
+        InetSocketAddress address = null;
+        if ( getReachableOrOneMethod != null )
+        {
+            try
+            {
+                address = (InetSocketAddress)getReachableOrOneMethod.invoke(server.addr);
+            }
+            catch ( Exception e )
+            {
+                logger.error("Could not call getReachableOrOneMethod.invoke({})", server.addr, e);
+            }
+        }
+        else if (addrField != null)
+        {
+            try
+            {
+                address = (InetSocketAddress)addrField.get(server);
+            }
+            catch ( Exception e )
+            {
+                logger.error("Could not call addrField.get({})", server, e);
+            }
+        }
+        return (address != null) ? address.getAddress().getHostAddress() : "unknown";
     }
 }
