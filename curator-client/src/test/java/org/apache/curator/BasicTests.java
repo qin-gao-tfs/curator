@@ -21,8 +21,8 @@ package org.apache.curator;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
 import org.apache.curator.retry.RetryOneTime;
 import org.apache.curator.test.BaseClassForTests;
+import org.apache.curator.test.Compatibility;
 import org.apache.curator.test.Timing;
-import org.apache.curator.utils.Compatibility;
 import org.apache.curator.utils.ZookeeperFactory;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -100,7 +100,7 @@ public class BasicTests extends BaseClassForTests
                                 // ignore
                             }
 
-                            Compatibility.injectSessionExpiration(client.getZooKeeper());
+                            client.getZooKeeper().getTestable().injectSessionExpiration();
 
                             Assert.assertTrue(timing.awaitLatch(latch));
                         }

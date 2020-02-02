@@ -31,9 +31,9 @@ import org.apache.curator.framework.state.ConnectionState;
 import org.apache.curator.framework.state.ConnectionStateListener;
 import org.apache.curator.retry.RetryOneTime;
 import org.apache.curator.test.BaseClassForTests;
+import org.apache.curator.test.Compatibility;
 import org.apache.curator.test.compatibility.Timing2;
 import org.apache.curator.utils.CloseableUtils;
-import org.apache.curator.utils.Compatibility;
 import org.apache.curator.utils.ZKPaths;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.WatchedEvent;
@@ -329,7 +329,7 @@ public class TestPersistentEphemeralNode extends BaseClassForTests
             observer.checkExists().usingWatcher(deletedTrigger).forPath(node.getActualPath());
 
             node.debugCreateNodeLatch = new CountDownLatch(1);
-            Compatibility.injectSessionExpiration(curator.getZookeeperClient().getZooKeeper());
+            curator.getZookeeperClient().getZooKeeper().getTestable().injectSessionExpiration();
 
             // Make sure the node got deleted
             assertTrue(deletedTrigger.firedWithin(timing.forSessionSleep().seconds(), TimeUnit.SECONDS));
@@ -359,7 +359,7 @@ public class TestPersistentEphemeralNode extends BaseClassForTests
             observer.checkExists().usingWatcher(deletedTrigger).forPath(node.getActualPath());
 
             node.debugCreateNodeLatch = new CountDownLatch(1);
-            Compatibility.injectSessionExpiration(curator.getZookeeperClient().getZooKeeper());
+            curator.getZookeeperClient().getZooKeeper().getTestable().injectSessionExpiration();
 
             // Make sure the node got deleted...
             assertTrue(deletedTrigger.firedWithin(timing.forSessionSleep().seconds(), TimeUnit.SECONDS));
@@ -400,7 +400,7 @@ public class TestPersistentEphemeralNode extends BaseClassForTests
 
                 node.debugCreateNodeLatch = new CountDownLatch(1);
                 // Kill the session, thus cleaning up the node...
-                Compatibility.injectSessionExpiration(curator.getZookeeperClient().getZooKeeper());
+                curator.getZookeeperClient().getZooKeeper().getTestable().injectSessionExpiration();
 
                 // Make sure the node ended up getting deleted...
                 assertTrue(deletionTrigger.firedWithin(timing.multiple(1.5).forSessionSleep().seconds(), TimeUnit.SECONDS));
@@ -443,7 +443,7 @@ public class TestPersistentEphemeralNode extends BaseClassForTests
             Trigger deletedTrigger = Trigger.deletedOrSetData();
             observer.checkExists().usingWatcher(deletedTrigger).forPath(node.getActualPath());
 
-            Compatibility.injectSessionExpiration(nodeCreator.getZookeeperClient().getZooKeeper());
+            nodeCreator.getZookeeperClient().getZooKeeper().getTestable().injectSessionExpiration();
 
             // Make sure the node got deleted...
             assertTrue(deletedTrigger.firedWithin(timing.forWaiting().seconds(), TimeUnit.SECONDS));
